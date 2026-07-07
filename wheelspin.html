@@ -208,9 +208,14 @@
             z-index: 10;
         }
 
+        /* ------------------------------------------------------------- */
+        /* ปรับขนาดวงล้อได้ที่นี่ (ปรับแล้ว ระบบจะคำนวณความคมชัดให้แบบ HD อัตโนมัติ) */
+        /* ------------------------------------------------------------- */
         .wheel-outer {
-            width: 480px;
-            height: 480px;
+            width: 800px;
+            /* แก้ไขขนาดความกว้างที่นี่ */
+            height: 800px;
+            /* แก้ไขขนาดความสูงที่นี่ */
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.4);
             border: 12px solid rgba(255, 255, 255, 0.9);
@@ -468,7 +473,7 @@
             box-shadow: 0 15px 25px rgba(255, 82, 82, 0.4);
         }
 
-        /* --- EPIC WINNER REVEAL (CLEAN DIRECT) --- */
+        /* --- EPIC WINNER REVEAL --- */
         .winner-overlay {
             position: fixed;
             top: 0;
@@ -615,7 +620,8 @@
         </div>
         <div class="wheel-outer">
             <div class="wheel-container">
-                <canvas id="wheelCanvas" width="456" height="456"></canvas>
+                <!-- นำแอตทริบิวต์ width/height ใน HTML ออกเพื่อให้สคริปต์คำนวณแบบ HD แทน -->
+                <canvas id="wheelCanvas"></canvas>
             </div>
         </div>
         <div class="spin-center-btn" onclick="spinWheel()">SPIN</div>
@@ -668,6 +674,10 @@
         
         let currentAngle = 0; 
 
+        // ขนาดจำลองทางสายตา (CSS Pixels)
+        let visualWidth = 0;
+        let visualHeight = 0;
+
         const segmentColors = [
             '#ff5252', '#34ace0', '#ffb142', '#33d9b2', 
             '#706fd3', '#ff7979', '#feca57', '#1dd1a1', 
@@ -678,7 +688,14 @@
 
         window.onload = function() {
             originalNames = nameInput.value;
+            resizeCanvas();
             updateCountAndDraw();
+        };
+
+        // ตรวจจับเมื่อผู้ใช้ปรับขนาดหน้าจอ เพื่อคำนวณสัดส่วนความชัดใหม่
+        window.onresize = function() {
+            resizeCanvas();
+            drawWheel();
         };
 
         function toggleLog() {
@@ -690,9 +707,28 @@
             settingsModal.classList.toggle('active'); 
         }
 
+        // --- DYNAMIC RETINA / RESIZE FUNCTION ---
+        // ฟังก์ชันนี้จะดึงขนาดจริงจาก CSS และทวีคูณพิกเซลภายในตามคุณสมบัติหน้าจอจริงเพื่อแก้ปัญหาตัวหนังสือแตก
+        function resizeCanvas() {
+            const rect = canvas.parentNode.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            
+            visualWidth = rect.width;
+            visualHeight = rect.height;
+            
+            // ขยายหน่วยความละเอียดแบบ Physical Pixel
+            canvas.width = visualWidth * dpr;
+            canvas.height = visualHeight * dpr;
+            
+            // ปรับ Scale ของ Context ให้เท่ากับ DPR
+            ctx.resetTransform();
+            ctx.scale(dpr, dpr);
+        }
+
         function updateCountAndDraw() {
             namesArray = nameInput.value.split('\n').map(n => n.trim()).filter(n => n !== "");
             countSpan.innerText = namesArray.length;
+            resizeCanvas();
             drawWheel();
         }
 
@@ -721,11 +757,11 @@
         // --- DRAWING WHEEL SYSTEM ---
         function drawWheel() {
             const numSegments = namesArray.length;
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const radius = canvas.width / 2;
+            const centerX = visualWidth / 2;
+            const centerY = visualHeight / 2;
+            const radius = visualWidth / 2;
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, visualWidth, visualHeight);
 
             if (numSegments === 0) {
                 ctx.beginPath();
@@ -797,14 +833,12 @@
             const targetPointerAngle = 1.5 * Math.PI; 
             const winnerSliceCenter = (winnerIdx * arcSize) + (arcSize / 2);
             
-            // เพิ่มรอบการหมุนเป็น 12 - 16 รอบ เพื่อความหน่วงที่ยาวนานและสวยงามยิ่งขึ้น
             const totalRotations = (12 + Math.floor(Math.random() * 5)) * 2 * Math.PI;
             const targetAngle = targetPointerAngle - winnerSliceCenter + totalRotations;
 
             const startAngle = currentAngle % (2 * Math.PI);
             const angleDiff = targetAngle - startAngle;
 
-            // เพิ่มระยะเวลาการหมุนและหยุดเป็น 8 วินาที (8000ms)
             const duration = 8000; 
             const startTime = performance.now();
 
@@ -814,7 +848,6 @@
                 const elapsed = now - startTime;
                 const progress = Math.min(elapsed / duration, 1);
 
-                // พลอตเส้นโค้งหน่วงความเร็วที่นุ่มนวลและกินระยะเวลาหยุดยาวนาน (Ease-Out Quartic)
                 const easeOut = 1 - Math.pow(1 - progress, 4);
                 currentAngle = startAngle + (angleDiff * easeOut);
                 
@@ -832,7 +865,6 @@
                 if (progress < 1) {
                     requestAnimationFrame(animateSpin);
                 } else {
-                    // เมื่อหยุดนิ่งแล้ว ทำการแสดงผลผู้ชนะทันทีแบบไม่มีดีเลย์
                     setTimeout(() => {
                         const winColor = segmentColors[winnerIdx % segmentColors.length];
                         revealWinner(winnerIdx, winColor);
@@ -850,14 +882,13 @@
             winnerNameDiv.innerText = winner;
             winnerNameDiv.style.textShadow = `0 10px 30px rgba(0,0,0,0.6), 0 0 40px ${colorStr}`;
             
-            // แสดงหน้าจอผู้ชนะทันทีพร้อมเปิดเอฟเฟกต์พลุกระดาษและเสียงฉลองความยินดี
             winnerOverlay.classList.add('active');
             addToLog(winner, colorStr);
             fireConfetti();
 
-            playSound(523.25, 'sine', 0.3, 0.25); // โน้ต C5
-            setTimeout(() => playSound(659.25, 'sine', 0.3, 0.25), 150); // โน้ต E5
-            setTimeout(() => playSound(783.99, 'sine', 0.5, 0.3), 300); // โน้ต G5
+            playSound(523.25, 'sine', 0.3, 0.25); 
+            setTimeout(() => playSound(659.25, 'sine', 0.3, 0.25), 150); 
+            setTimeout(() => playSound(783.99, 'sine', 0.5, 0.3), 300); 
 
             namesArray.splice(winnerIdx, 1);
             nameInput.value = namesArray.join('\n');
